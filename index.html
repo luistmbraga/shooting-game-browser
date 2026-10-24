@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crowd Control Runner</title>
+<style>
+    body { 
+        margin: 0; 
+        padding: 0; 
+        background-color: #1a1a1a; 
+        display: flex; 
+        justify-content: center; 
+        align-items: center; 
+        height: 100vh; 
+        overflow: hidden; 
+        font-family: sans-serif; 
+    }
+    canvas { 
+        background-color: #2b2b2b; 
+        box-shadow: 0 0 20px rgba(0,0,0,0.8); 
+        border: 2px solid #444;
+    }
+    #ui { 
+        position: absolute; 
+        top: 20px; 
+        color: white; 
+        font-size: 24px; 
+        font-weight: bold; 
+        pointer-events: none;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    }
+</style>
+</head>
+<body>
+<div id="ui">Units: <span id="unitCount">1</span> | Score: <span id="score">0</span></div>
+<canvas id="gameCanvas" width="400" height="700"></canvas>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const unitDisplay = document.getElementById('unitCount');
+    const scoreDisplay = document.getElementById('score');
+
+    let player = { x: 200, y: 550, units: 1 };
+    let bullets = [];
+    let obstacles = [];
+    let gates = [];
+    let score = 0;
+    let gameSpeed = 3;
+    let frame = 0;
+
+    // Mouse and Touch Controls
+    let targetX = 200;
+    canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        targetX = e.clientX - rect.left;
+    });
+    canvas.addEventListener('touchmove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        targetX = e.touches[0].clientX - rect.left;
+        e.preventDefault();
+    }, {passive: false});
+
+    function spawnGate() {
+        // Spawns the blue/yellow "+X" gates
+        let val = Math.floor(Math.random() * 20) + 5;
+        let isLeft = Math.random() > 0.5;
+        gates.push({
+            x: isLeft ? 0 : 200,
+            y: -50, 
+            width: 200, 
+            height: 50,
+            value: val, 
+            color: '#2196F3' // Blue gate
+        });
+    }
+
+    function spawnObstacle() {
+        // Spawns the blocks with health numbers
+        let hp = Math.floor(Math.random() * 100) + (player.units * 2);
+        obstacles.push({
+            x: Math.random() * (canvas.width - 80),
+            y: -80, 
+            width: 80, 
+            height: 40,
+            hp: hp, 
+            maxHp: hp, 
+            color: '#607D8B' // Gray block
+        });
+    }
+
+    function update() {
+        frame++;
+        
+        // Smooth player horizontal movement
+        player.x += (targetX - player.x) * 0.15;
+        if (player.x < 20) player.x = 20;
+        if (player.x > canvas.width - 20) player.x = canvas.width - 20;
+
+        // Auto-Shooting Mechanics
+        let fireRate = Math.max(3, 15 - Math.floor(player.units / 10)); 
+        if (frame % fireRate === 0) {
+            let numBullets = Math.min(6, Math.ceil(player.units / 15));
+            for(let i = 0; i < numBullets; i++) {
+                let offset = (i - (numBullets - 1) / 2) * 12;
+                bullets.push({ 
+                    x: player.x + offset, 
+                    y: player.y - 20, 
+                    speed: 10, 
+                    radius: 4 
+                });
+            }
+        }
+
+        // Move and clear bullets
+        for (let i = bullets.length - 1; i >= 0; i--) {
+            bullets[i].y -= bullets[i].speed;
+            if (bullets[i].y < 0) bullets.splice(i, 1);
+        }
+
+        // Move and handle obstacles (Numbered blocks)
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+            let obs = obstacles[i];
+            obs.y += gameSpeed;
+
+            // Bullet collision with obstacle
+            for (let j = bullets.length - 1; j >= 0; j--) {
+                let b = bullets[j];
+                if (b.x > obs.x && b.x < obs.x + obs.width && 
+                    b.y > obs.y && b.y < obs.y + obs.height) {
+                    obs.hp--;
+                    bullets.splice(j, 1); // Destroy bullet
+                    
+                    if (obs.hp <= 0) {
+                        score += obs.maxHp;
+                        obstacles.splice(i, 1); // Destroy obstacle
+                        break;
+                    }
+                }
+            }
+            if (obs && obs.y > canvas.height) obstacles.splice(i, 1);
+        }
+
+        // Move and handle gates (+1, +99 logic)
+        for (let i = gates.length - 1; i >= 0; i--) {
+            let g = gates[i];
+            g.y += gameSpeed;
+            
+            // Player passes through gate
+            if (player.y < g.y + g.height && player.y > g.y && 
+                player.x > g.x && player.x < g.x + g.width) {
+                player.units += g.value;
+                gates.splice(i, 1);
+            } else if (g.y > canvas.height) {
+                gates.splice(i, 1);
+            }
+        }
+
+        // Procedural Spawning
+        if (frame % 180 === 0) spawnGate();
+        if (frame % 90 === 0) spawnObstacle();
+
+        // Update UI
+        unitDisplay.innerText = player.units;
+        scoreDisplay.innerText = score;
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Scrolling floor illusion
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 2;
+        for(let i = 0; i < canvas.height; i += 50) {
+            let y = (i + (frame * gameSpeed)) % canvas.height;
+            ctx.beginPath(); 
+            ctx.moveTo(0, y); 
+            ctx.lineTo(canvas.width, y); 
+            ctx.stroke();
+        }
+
+        // Draw Gates
+        ctx.font = "bold 24px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        gates.forEach(g => {
+            ctx.fillStyle = g.color;
+            ctx.globalAlpha = 0.4;
+            ctx.fillRect(g.x, g.y, g.width, g.height);
+            ctx.globalAlpha = 1.0;
+            ctx.fillStyle = "white";
+            ctx.fillText("+" + g.value, g.x + g.width/2, g.y + g.height/2);
+            // Gate border
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(g.x, g.y, g.width, g.height);
+        });
+
+        // Draw Obstacles (Skeletons/Blocks equivalent)
+        obstacles.forEach(obs => {
+            ctx.fillStyle = obs.color;
+            ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+            ctx.fillStyle = "white";
+            ctx.fillText(obs.hp, obs.x + obs.width/2, obs.y + obs.height/2);
+        });
+
+        // Draw Bullets (Fire projectiles)
+        ctx.fillStyle = '#ff9800';
+        bullets.forEach(b => {
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // Draw Player Crowd (Blue units)
+        ctx.fillStyle = '#1e88e5';
+        let displayUnits = Math.min(player.units, 30); // Cap drawing to prevent lag
+        for(let i = 0; i < displayUnits; i++) {
+            // Distribute units in a circular cluster based on count
+            let angle = i * 2.4;
+            let rad = Math.sqrt(i) * 7;
+            let px = player.x + Math.cos(angle) * rad;
+            let py = player.y + Math.sin(angle) * rad;
+            
+            ctx.beginPath();
+            ctx.arc(px, py, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#0d47a1';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+    }
+
+    function gameLoop() {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
+</script>
+</body>
+</html>

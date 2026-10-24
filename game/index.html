@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+    />
+    <meta name="theme-color" content="#0c0d10" />
+    <title>Crowd Fire</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #0c0d10;
+        overflow: hidden;
+        overscroll-behavior: none;
+      }
+      body {
+        display: grid;
+        place-items: center;
+        font-family: Impact, "Arial Black", sans-serif;
+      }
+      #stage {
+        position: relative;
+        touch-action: none;
+        cursor: pointer;
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      #game {
+        display: block;
+        background: #16181e;
+      }
+      #hud {
+        position: absolute;
+        left: 0;
+        top: 0;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <canvas id="game" width="400" height="720"></canvas>
+      <canvas id="hud" width="400" height="720"></canvas>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
